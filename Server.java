@@ -60,25 +60,56 @@ public class Server {
                     sendResponse(out, 400, "Bad Request", "text/plain", "Empty request.");
                     return;
                 }
-        
+
                 String[] requestParts = requestLine.split(" ");
                 if (requestParts.length != 3) {
                     sendResponse(out, 400, "Bad Request", "text/plain", "Malformed request.");
                     return;
                 }
-        
+
                 String method = requestParts[0];
                 String resourcePath = requestParts[1];
-        
+
                 if ("GET".equals(method)) {
                     handleGetRequest(resourcePath, out, binaryOut);
                 } else if ("POST".equals(method)) {
-                    // Implement POST request handling
-                    // ...
+                    // Debugging: Print received POST data
+                    String requestBody = "";
+                    try {
+                        int contentLength = 0;
+                        String contentLengthHeader = null;
+
+                        // Read request headers to find Content-Length
+                        while (true) {
+                            String headerLine = in.readLine();
+                            if (headerLine == null || headerLine.isEmpty()) {
+                                break;
+                            }
+                            if (headerLine.startsWith("Content-Length: ")) {
+                                contentLengthHeader = headerLine;
+                            }
+                        }
+
+                        if (contentLengthHeader != null) {
+                            contentLength = Integer.parseInt(contentLengthHeader.substring("Content-Length: ".length()));
+                        }
+
+                        // Read the POST request body
+                        char[] buffer = new char[contentLength];
+                        in.read(buffer, 0, contentLength);
+                        requestBody = new String(buffer);
+                    } catch (IOException ex) {
+                        // Handle any exceptions
+                    }
+
+                    System.out.println("Received POST data:\n" + requestBody); // Debugging line
+
+                    Map<String, String> parameters = parseParameters(requestBody);
+                    handlePostRequest(parameters, out);
                 } else {
                     sendResponse(out, 501, "Not Implemented", "text/plain", "Method not implemented.");
                 }
-        
+
             } catch (IOException ex) {
                 if (out != null) {
                     sendResponse(out, 500, "Internal Server Error", "text/plain", "Internal server error.");
@@ -95,7 +126,7 @@ public class Server {
                 }
             }
         }
-        
+
         private String getContentType(String filePath) {
             if (filePath.endsWith(".html") || filePath.endsWith(".htm")) {
                 return "text/html";
@@ -173,6 +204,48 @@ public class Server {
 
             binaryOut.write(responseData);
             binaryOut.flush();
+        }
+
+        private Map<String, String> parseParameters(String requestBody) {
+            Map<String, String> parameters = new HashMap<>();
+            String[] parameterPairs = requestBody.split("&");
+            for (String pair : parameterPairs) {
+                String[] keyValue = pair.split("=");
+                if (keyValue.length == 2) {
+                    String paramName = keyValue[0];
+                    try {
+                        String paramValue = URLDecoder.decode(keyValue[1], "UTF-8");
+                        parameters.put(paramName, paramValue);
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                        // Handle the exception or log an error message as needed
+                    }
+                }
+            }
+            return parameters;
+        }
+
+        private void handlePostRequest(Map<String, String> parameters, PrintWriter out) {
+            // Generate the HTML page with parameter details
+            StringBuilder htmlResponse = new StringBuilder();
+            htmlResponse.append("<!DOCTYPE html>\n<html>\n<head>\n<title>Parameters Info</title>\n</head>\n<body>\n<h1>Parameters Info</h1>\n");
+        
+            // Define the order of parameters based on their names in the form
+            String[] parameterOrder = {"sender", "receiver", "subject", "message", "confirm"};
+        
+            htmlResponse.append("<ul>");
+            for (String paramName : parameterOrder) {
+                String paramValue = parameters.get(paramName);
+                if (paramValue != null) {
+                    htmlResponse.append("<li>").append(paramName).append(": ").append(paramValue).append("</li>");
+                }
+            }
+            htmlResponse.append("</ul>");
+        
+            htmlResponse.append("</body>\n</html>");
+        
+            // Send the HTML content as the response
+            sendResponse(out, 200, "OK", "text/html", htmlResponse.toString());
         }
     }
 }

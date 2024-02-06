@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Computer Networks 2023: Exercise 1</title>
+    <style>
+        @keyframes moveTitle {
+            0% { color: blue; }
+            10% { color: navy; }
+            100% { color: blue; }
+        }
+        h1 {
+            animation: moveTitle 2s infinite;
+        }
+        h2 {
+            color: red;
+        }
+        .center {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        img {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Computer Networks 2023: Exercise 1</h1>
+    <h2>Yuval Greenshpan</h2>
+    <div class="center">
+        <img src="Hands.jpg" alt="hands">
+        <img src="Muse.jpg" alt="muse">
+    </div>
+
+    <p><a href="https://piazza.com/class/lq8bwborc233h1">
+    Course Website</a></p>
+
+    <p><a href="https://www.google.com">Favorite Website</a></p>
+
+    <hr>
+
+    <form action="#" method="post">
+        <label for="sender">Sender:</label>
+        <input type="text" id="sender" name="sender"><br>
+
+        <label for="receiver">Receiver:</label>
+        <input type="text" id="receiver" name="receiver"><br>
+
+        <label for="subject">Subject:</label>
+        <input type="text" id="subject" name="subject"><br>
+
+        <label for="message">Message:</label><br>
+        <textarea id="message" name="message" rows="4" cols="50"></textarea><br>
+
+        <!-- Checkbox added below -->
+        <input type="checkbox" id="confirm" name="confirm">
+        <label for="confirm">I confirm that the above information is correct</label><br>
+
+        <input type="submit" value="Submit">
+    </form>
+
+</body>
+</html>

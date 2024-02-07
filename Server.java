@@ -15,7 +15,7 @@ public class Server {
         try {
             loadConfig(); // Load server configuration
             threadPool = Executors.newFixedThreadPool(maxThreads); // Create thread pool
-
+            
             startServer(); // Start server
         } catch (Exception ex) {
             System.out.println("Server startup failed: " + ex.getMessage()); // Print startup failure message
@@ -64,6 +64,7 @@ public class Server {
             ) {
                 out = new PrintWriter(binaryOut, true);
                 String requestLine = in.readLine();
+                System.out.println("Received HTTP request: " + requestLine);
                 if (requestLine == null) {
                     sendResponse(out, 400, "Bad Request", "text/plain", "Empty request.");
                     return;
@@ -199,8 +200,9 @@ public class Server {
         }
 
         private void sendResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, String responseText) {
-            out.println("HTTP/1.1 " + statusCode + " " + statusMessage);
-            out.println("Content-Type: " + contentType);
+            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\nContent-Type: " + contentType + "\n";
+            System.out.println("Sending HTTP response: \n" + httpResponse);
+            out.println(httpResponse);
             out.println();
             out.println(responseText);
             out.flush();
@@ -208,12 +210,11 @@ public class Server {
 
         private void sendBinaryResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, byte[] responseData) throws IOException {
             PrintWriter headerOut = new PrintWriter(binaryOut, true);
-            headerOut.println("HTTP/1.1 " + statusCode + " " + statusMessage);
-            headerOut.println("Content-Type: " + contentType);
-            headerOut.println("Content-Length: " + responseData.length);
-            headerOut.println();
+            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\nContent-Type: " + contentType + "\nContent-Length: " + responseData.length + "\n";
+            System.out.println("Sending HTTP response: \n" + httpResponse);
+            headerOut.println(httpResponse);
             headerOut.flush();
-
+        
             binaryOut.write(responseData);
             binaryOut.flush();
         }
@@ -266,5 +267,52 @@ public class Server {
             return resourcePath;
         }
         
+        private void handleHeadRequest(String resourcePath, PrintWriter out) {
+            // Implement handling of HEAD request here
+            // This method should behave similar to GET but without sending the actual content
+            // You should print request and response headers as per the requirement
+        
+            resourcePath = sanitizeResourcePath(resourcePath);
+        
+            if ("/".equals(resourcePath)) {
+                resourcePath = defaultPage;
+            } else {
+                resourcePath = root + resourcePath;
+            }
+        
+            File resourceFile = new File(resourcePath);
+            if (resourceFile.exists() && resourceFile.isFile()) {
+                String contentType = getContentType(resourcePath);
+                long contentLength = resourceFile.length(); // New line to get content length
+                sendHeadResponse(out, 200, "OK", contentType, contentLength); // New line to send HEAD response
+            } else {
+                sendResponse(out, 404, "Not Found", "text/plain", "Resource not found.");
+            }
+        }
+                
+        private void sendHeadResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, long contentLength) {
+            out.println("HTTP/1.1 " + statusCode + " " + statusMessage);
+            out.println("Content-Type: " + contentType);
+            out.println("Content-Length: " + contentLength); // New line to include content length
+            out.println(); // New line to indicate end of headers
+            out.flush();
+        }
+        
+        private void handleTraceRequest(BufferedReader in, PrintWriter out) throws IOException {
+            // Implement handling of TRACE request here
+            // This method should echo back the received request headers to the client
+            StringBuilder requestHeaders = new StringBuilder();
+            String line;
+            while ((line = in.readLine()) != null && !line.isEmpty()) {
+                requestHeaders.append(line).append("\r\n");
+            }
+        
+            // Print received request headers
+            System.out.println("Received TRACE request headers:");
+            System.out.println(requestHeaders.toString());
+        
+            // Send back the received request headers to the client
+            sendResponse(out, 200, "OK", "message/http", requestHeaders.toString());
+        }
     }
 } 

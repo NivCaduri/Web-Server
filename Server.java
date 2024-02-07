@@ -140,11 +140,15 @@ public class Server {
         }
 
         private void handleGetRequest(String resourcePath, PrintWriter out, OutputStream binaryOut) {
+            // Sanitize the resourcePath to prevent directory traversal
+            resourcePath = sanitizeResourcePath(resourcePath);
+        
             if ("/".equals(resourcePath)) {
                 resourcePath = defaultPage;
             } else {
                 resourcePath = root + resourcePath;
             }
+        
 
             File resourceFile = new File(resourcePath);
             if (resourceFile.exists() && resourceFile.isFile()) {
@@ -247,5 +251,12 @@ public class Server {
             // Send the HTML content as the response
             sendResponse(out, 200, "OK", "text/html", htmlResponse.toString());
         }
+
+        private String sanitizeResourcePath(String resourcePath) {
+            // Remove occurrences of '/../' to prevent directory traversal
+            resourcePath = resourcePath.replaceAll("/\\.\\./", "/");
+            return resourcePath;
+        }
+        
     }
 }

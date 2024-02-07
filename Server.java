@@ -9,34 +9,42 @@ public class Server {
     private static String root;
     private static String defaultPage;
     private static int maxThreads;
+    private static ExecutorService threadPool;
 
     public static void main(String[] args) {
-        loadConfig();
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
+        try {
+            loadConfig(); // Load server configuration
+            threadPool = Executors.newFixedThreadPool(maxThreads); // Create thread pool
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Web Server is listening on port " + port);
-
-            while (true) {
-                Socket socket = serverSocket.accept();
-                threadPool.execute(new ClientHandler(socket));
+            startServer(); // Start server
+        } catch (Exception ex) {
+            System.out.println("Server startup failed: " + ex.getMessage()); // Print startup failure message
+            ex.printStackTrace(); // Print exception stack trace
+            if (threadPool != null) {
+                threadPool.shutdown(); // Shutdown thread pool
             }
-        } catch (IOException ex) {
-            System.out.println("Server exception: " + ex.getMessage());
-            ex.printStackTrace();
         }
     }
 
-    private static void loadConfig() {
+    private static void startServer() throws IOException {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Web Server is listening on port " + port); // Print listening message
+
+            while (true) {
+                Socket socket = serverSocket.accept(); // Accept incoming connection
+                threadPool.execute(new ClientHandler(socket)); // Execute client handler in thread pool
+            }
+        }
+    }
+
+    private static void loadConfig() throws IOException {
         Properties prop = new Properties();
         try (InputStream input = new FileInputStream(CONFIG_FILE)) {
-            prop.load(input);
-            port = Integer.parseInt(prop.getProperty("port"));
-            root = prop.getProperty("root");
-            defaultPage = prop.getProperty("defaultPage");
-            maxThreads = Integer.parseInt(prop.getProperty("maxThreads"));
-        } catch (IOException ex) {
-            ex.printStackTrace();
+            prop.load(input); // Load configuration properties
+            port = Integer.parseInt(prop.getProperty("port")); // Read port from config
+            root = prop.getProperty("root"); // Read root directory from config
+            defaultPage = prop.getProperty("defaultPage"); // Read default page from config
+            maxThreads = Integer.parseInt(prop.getProperty("maxThreads")); // Read max threads from config
         }
     }
 
@@ -259,4 +267,4 @@ public class Server {
         }
         
     }
-}
+} 

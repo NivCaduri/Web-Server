@@ -11,11 +11,13 @@ public class Server {
     private static int maxThreads;
     private static ExecutorService threadPool;
 
+    
+
     public static void main(String[] args) {
+        
         try {
             loadConfig(); // Load server configuration
             threadPool = Executors.newFixedThreadPool(maxThreads); // Create thread pool
-            
             startServer(); // Start server
         } catch (Exception ex) {
             System.out.println("Server startup failed: " + ex.getMessage()); // Print startup failure message
@@ -40,11 +42,11 @@ public class Server {
     private static void loadConfig() throws IOException {
         Properties prop = new Properties();
         try (InputStream input = new FileInputStream(CONFIG_FILE)) {
-            prop.load(input); // Load configuration properties
-            port = Integer.parseInt(prop.getProperty("port")); // Read port from config
-            root = prop.getProperty("root"); // Read root directory from config
-            defaultPage = prop.getProperty("defaultPage"); // Read default page from config
-            maxThreads = Integer.parseInt(prop.getProperty("maxThreads")); // Read max threads from config
+            prop.load(input);
+            port = Integer.parseInt(prop.getProperty("port"));
+            root = prop.getProperty("root").replace("~", System.getProperty("user.home"));
+            defaultPage = prop.getProperty("defaultPage");
+            maxThreads = Integer.parseInt(prop.getProperty("maxThreads"));
         }
     }
 
@@ -384,6 +386,10 @@ public class Server {
         
             // Send back the received request headers to the client
             sendResponse(out, 200, "OK", "message/http", requestHeaders.toString());
+
+            
         }
+
+        
     }
 } 

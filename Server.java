@@ -172,12 +172,12 @@ public class Server {
         }
 
         private static void sendChunkedResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, String responseText) {
-            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\nContent-Type: " + contentType + "\nTransfer-Encoding: chunked\n";
+            System.out.println("maotk");
+            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\nContent-Type: " + contentType + "\r\nTransfer-Encoding: chunked\r\n\r\n";
             System.out.println("Sending HTTP response: \n" + httpResponse);
-            out.println(httpResponse);
-            out.println();
+            out.print(httpResponse);
             out.flush();
-
+        
             // Send response body in chunks
             int chunkSize = 20;
             for (int i = 0; i < responseText.length(); i += chunkSize) {
@@ -187,7 +187,7 @@ public class Server {
                 out.flush();
             }
             // Send the last chunk to indicate end of response
-            out.println("0\r\n");
+            out.print("0\r\n\r\n");
             out.flush();
         }
 
@@ -204,13 +204,13 @@ public class Server {
 
         private static void sendChunkedBinaryResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, byte[] responseData) throws IOException {
             PrintWriter headerOut = new PrintWriter(binaryOut, true);
-            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\nContent-Type: " + contentType + "\nTransfer-Encoding: chunked\n";
+            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\nContent-Type: " + contentType + "\r\nTransfer-Encoding: chunked\r\n\r\n";
             System.out.println("Sending HTTP response: \n" + httpResponse);
-            headerOut.println(httpResponse);
+            headerOut.print(httpResponse);
             headerOut.flush();
-
+        
             // Send response body in chunks
-            int chunkSize = 20;
+            int chunkSize = 20; // Adjust chunk size as needed
             for (int i = 0; i < responseData.length; i += chunkSize) {
                 int endIndex = Math.min(i + chunkSize, responseData.length);
                 String chunkSizeHeader = Integer.toHexString(endIndex - i) + "\r\n";
@@ -222,10 +222,8 @@ public class Server {
             // Send the last chunk to indicate end of response
             binaryOut.write("0\r\n\r\n".getBytes());
             binaryOut.flush();
-}
+        }
 
-
-        
     
         private String getContentType(String filePath) {
             if (filePath.endsWith(".html") || filePath.endsWith(".htm")) {
@@ -240,8 +238,13 @@ public class Server {
         }
 
         private void handleGetRequest(String resourcePath, PrintWriter out, OutputStream binaryOut) {
+            
             // Sanitize the resourcePath to prevent directory traversal
             resourcePath = sanitizeResourcePath(resourcePath);
+            if (resourcePath.contains("?chuncked:yes")) {
+                useChunked.set(true);
+                resourcePath = resourcePath.split("\\?")[0]; // Remove the query parameter from the path
+            }
         
             if ("/".equals(resourcePath)) {
                 resourcePath = defaultPage;
@@ -400,4 +403,4 @@ public class Server {
 
         
     }
-} 
+}

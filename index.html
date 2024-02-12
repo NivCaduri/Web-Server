@@ -1,66 +1,161 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/x-icon" href="burger.png" />
     <title>Computer Networks 2023: Exercise 1</title>
     <style>
-        @keyframes moveTitle {
-            0% { color: blue; }
-            10% { color: navy; }
-            100% { color: blue; }
+      body {
+        font-family: 'Arial', sans-serif;
+        background-color: #f0f0f0;
+        margin: 0;
+        padding: 20px;
+      }
+
+      .header {
+        text-align: center;
+      }
+
+      h1 {
+        color: #0066cc;
+        animation: moveTitle 2s infinite;
+      }
+
+      h2 {
+        color: #ff3333;
+      }
+
+      .center {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      img {
+        margin: 10px;
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .links {
+        text-align: center;
+        margin: 20px 0;
+      }
+
+      a {
+        color: #0066cc;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      hr {
+        border: 1px solid #ddd;
+      }
+
+      form {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        color: #333;
+      }
+
+      input[type='text'],
+      textarea {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .checkbox-group label {
+        margin-left: 5px;
+      }
+
+      input[type='submit'] {
+        background-color: #0066cc;
+        color: #fff;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      input[type='submit']:hover {
+        background-color: #005bb5;
+      }
+
+      @keyframes moveTitle {
+        0% {
+          color: #0066cc;
         }
-        h1 {
-            animation: moveTitle 2s infinite;
+        10% {
+          color: #001a33;
         }
-        h2 {
-            color: red;
+        100% {
+          color: #0066cc;
         }
-        .center {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        img {
-            margin: 10px;
-        }
+      }
     </style>
-</head>
-<body>
-    <h1>Computer Networks 2023: Exercise 1</h1>
-    <h2>Yuval Greenshpan</h2>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Computer Networks 2023: Exercise 1</h1>
+      <h2>Yuval Greenshpan & Niv Caduri</h2>
+    </div>
+    
     <div class="center">
-        <img src="Hands.jpg" alt="hands">
-        <img src="Muse.jpg" alt="muse">
+      <img src="Hands.jpg" alt="hands" />
+      <img src="Muse.jpg" alt="muse" />
     </div>
 
-    <p><a href="https://piazza.com/class/lq8bwborc233h1">
-    Course Website</a></p>
+    <div class="links">
+      <p><a href="https://piazza.com/class/lq8bwborc233h1">Course Website</a></p>
+      <p><a href="https://www.google.com">Favorite Website</a></p>
+    </div>
 
-    <p><a href="https://www.google.com">Favorite Website</a></p>
+    <hr />
 
-    <hr>
+    <form action="params_info.html" method="post">
+      <label for="sender">Sender:</label>
+      <input type="text" id="sender" name="sender" />
 
-    <form action="#" method="post">
-        <label for="sender">Sender:</label>
-        <input type="text" id="sender" name="sender"><br>
+      <label for="receiver">Receiver:</label>
+      <input type="text" id="receiver" name="receiver" />
 
-        <label for="receiver">Receiver:</label>
-        <input type="text" id="receiver" name="receiver"><br>
+      <label for="subject">Subject:</label>
+      <input type="text" id="subject" name="subject" />
 
-        <label for="subject">Subject:</label>
-        <input type="text" id="subject" name="subject"><br>
+      <label for="message">Message:</label>
+      <textarea id="message" name="message" rows="4" cols="50"></textarea>
 
-        <label for="message">Message:</label><br>
-        <textarea id="message" name="message" rows="4" cols="50"></textarea><br>
+      <div class="checkbox-group">
+        <input type="checkbox" id="confirm" name="confirm" />
+        <label for="confirm">I confirm that the above information is correct</label>
+      </div>
 
-        <!-- Checkbox added below -->
-        <input type="checkbox" id="confirm" name="confirm">
-        <label for="confirm">I confirm that the above information is correct</label><br>
-
-        <input type="submit" value="Submit">
+      <input type="submit" value="Submit" />
     </form>
-
-</body>
+  </body>
 </html>

@@ -179,7 +179,7 @@ public class Server {
             out.flush();
 
             // Send response body in chunks
-            int chunkSize = 1024;
+            int chunkSize = 20;
             for (int i = 0; i < responseText.length(); i += chunkSize) {
                 int endIndex = Math.min(i + chunkSize, responseText.length());
                 String chunk = Integer.toHexString(endIndex - i) + "\r\n" + responseText.substring(i, endIndex) + "\r\n";
@@ -210,7 +210,7 @@ public class Server {
             headerOut.flush();
 
             // Send response body in chunks
-            int chunkSize = 1024;
+            int chunkSize = 20;
             for (int i = 0; i < responseData.length; i += chunkSize) {
                 int endIndex = Math.min(i + chunkSize, responseData.length);
                 String chunkSizeHeader = Integer.toHexString(endIndex - i) + "\r\n";
@@ -314,19 +314,27 @@ public class Server {
         private void handlePostRequest(Map<String, String> parameters, PrintWriter out) {
             // Generate the HTML page with parameter details
             StringBuilder htmlResponse = new StringBuilder();
-            htmlResponse.append("<!DOCTYPE html>\n<html>\n<head>\n<title>Parameters Info</title>\n</head>\n<body>\n<h1>Parameters Info</h1>\n");
+            htmlResponse.append("<!DOCTYPE html>\n<html>\n<head>\n")
+                       .append("<title>Parameters Info</title>\n")
+                       .append("<style>")
+                       .append("body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; }\n")
+                       .append("h1 { color: #444; background-color: #ddd; padding: 10px; text-align: center; }\n")
+                       .append("ul { list-style: none; padding: 0; }\n")
+                       .append("li { background: #fff; padding: 10px; margin: 10px; border: 1px solid #ddd; }\n")
+                       .append("</style>\n")
+                       .append("</head>\n<body>\n<h1>Parameters Info</h1>\n");
         
             // Define the order of parameters based on their names in the form
             String[] parameterOrder = {"sender", "receiver", "subject", "message", "confirm"};
         
-            htmlResponse.append("<ul>");
+            htmlResponse.append("<ul>\n");
             for (String paramName : parameterOrder) {
                 String paramValue = parameters.get(paramName);
                 if (paramValue != null) {
-                    htmlResponse.append("<li>").append(paramName).append(": ").append(paramValue).append("</li>");
+                    htmlResponse.append("<li><strong>").append(paramName).append(":</strong> ").append(paramValue).append("</li>\n");
                 }
             }
-            htmlResponse.append("</ul>");
+            htmlResponse.append("</ul>\n");
         
             htmlResponse.append("</body>\n</html>");
         

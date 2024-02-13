@@ -71,25 +71,24 @@ public class Server {
                     sendResponse(out, 400, "Bad Request", "text/plain", "Empty request.");
                     return;
                 }
-    
+        
                 String[] requestParts = requestLine.split(" ");
                 if (requestParts.length != 3) {
                     sendResponse(out, 400, "Bad Request", "text/plain", "Malformed request.");
                     return;
                 }
-    
+        
                 String method = requestParts[0];
                 String resourcePath = requestParts[1];
-    
+        
                 if ("GET".equals(method)) {
                     handleGetRequest(resourcePath, out, binaryOut);
                 } else if ("POST".equals(method)) {
-                    // Debugging: Print received POST data
                     String requestBody = "";
                     try {
                         int contentLength = 0;
                         String contentLengthHeader = null;
-    
+        
                         // Read request headers to find Content-Length
                         while (true) {
                             String headerLine = in.readLine();
@@ -98,16 +97,13 @@ public class Server {
                             }
                             if (headerLine.startsWith("Content-Length: ")) {
                                 contentLengthHeader = headerLine;
-                            } else if (headerLine.equalsIgnoreCase("chunked: yes")) {
-                                useChunked.set(true); // Set chunked flag to true if "chunked: yes" header is found
-                                System.out.println("chunked: yes");
                             }
                         }
-    
+        
                         if (contentLengthHeader != null) {
                             contentLength = Integer.parseInt(contentLengthHeader.substring("Content-Length: ".length()));
                         }
-    
+        
                         // Read the POST request body
                         char[] buffer = new char[contentLength];
                         in.read(buffer, 0, contentLength);
@@ -115,15 +111,15 @@ public class Server {
                     } catch (IOException ex) {
                         // Handle any exceptions
                     }
-    
+        
                     System.out.println("Received POST data:\n" + requestBody); // Debugging line
-    
+        
                     Map<String, String> parameters = parseParameters(requestBody);
-                    handlePostRequest(parameters, out);
+                    handlePostRequest(resourcePath, parameters, out);
                 } else {
                     sendResponse(out, 501, "Not Implemented", "text/plain", "Method not implemented.");
                 }
-    
+        
             } catch (IOException ex) {
                 if (out != null) {
                     sendResponse(out, 500, "Internal Server Error", "text/plain", "Internal server error.");
@@ -135,20 +131,22 @@ public class Server {
                         out.close();
                     }
                     socket.close();
-                    useChunked.remove(); // Remove the chunked flag after handling the request
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }
+        
 
         private static ThreadLocal<Boolean> useChunked = ThreadLocal.withInitial(() -> false);
 
         private static void sendResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, String responseText) {
             boolean chunked = useChunked.get();
             if (chunked) {
+                System.out.println("using chunked HTML");
                 sendChunkedResponse(out, statusCode, statusMessage, contentType, responseText);
             } else {
+                System.out.println("not using chunked HTML");
                 sendNormalResponse(out, statusCode, statusMessage, contentType, responseText);
             }
         }
@@ -156,8 +154,10 @@ public class Server {
         private static void sendBinaryResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, byte[] responseData) throws IOException {
             boolean chunked = useChunked.get();
             if (chunked) {
+                System.out.println("using chunked image");
                 sendChunkedBinaryResponse(binaryOut, statusCode, statusMessage, contentType, responseData);
             } else {
+                System.out.println("not using chunked image");
                 sendNormalBinaryResponse(binaryOut, statusCode, statusMessage, contentType, responseData);
             }
         }
@@ -172,14 +172,13 @@ public class Server {
         }
 
         private static void sendChunkedResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, String responseText) {
-            System.out.println("maotk");
             String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\nContent-Type: " + contentType + "\r\nTransfer-Encoding: chunked\r\n\r\n";
             System.out.println("Sending HTTP response: \n" + httpResponse);
             out.print(httpResponse);
             out.flush();
         
             // Send response body in chunks
-            int chunkSize = 20;
+            int chunkSize = 1024;
             for (int i = 0; i < responseText.length(); i += chunkSize) {
                 int endIndex = Math.min(i + chunkSize, responseText.length());
                 String chunk = Integer.toHexString(endIndex - i) + "\r\n" + responseText.substring(i, endIndex) + "\r\n";
@@ -210,7 +209,7 @@ public class Server {
             headerOut.flush();
         
             // Send response body in chunks
-            int chunkSize = 20; // Adjust chunk size as needed
+            int chunkSize = 1024; // Adjust chunk size as needed
             for (int i = 0; i < responseData.length; i += chunkSize) {
                 int endIndex = Math.min(i + chunkSize, responseData.length);
                 String chunkSizeHeader = Integer.toHexString(endIndex - i) + "\r\n";
@@ -241,7 +240,7 @@ public class Server {
             
             // Sanitize the resourcePath to prevent directory traversal
             resourcePath = sanitizeResourcePath(resourcePath);
-            if (resourcePath.contains("?chuncked:yes")) {
+            if (resourcePath.contains("?chunked:yes")) {
                 useChunked.set(true);
                 resourcePath = resourcePath.split("\\?")[0]; // Remove the query parameter from the path
             }
@@ -314,36 +313,45 @@ public class Server {
             return parameters;
         }
 
-        private void handlePostRequest(Map<String, String> parameters, PrintWriter out) {
-            // Generate the HTML page with parameter details
-            StringBuilder htmlResponse = new StringBuilder();
-            htmlResponse.append("<!DOCTYPE html>\n<html>\n<head>\n")
-                       .append("<title>Parameters Info</title>\n")
-                       .append("<style>")
-                       .append("body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; }\n")
-                       .append("h1 { color: #444; background-color: #ddd; padding: 10px; text-align: center; }\n")
-                       .append("ul { list-style: none; padding: 0; }\n")
-                       .append("li { background: #fff; padding: 10px; margin: 10px; border: 1px solid #ddd; }\n")
-                       .append("</style>\n")
-                       .append("</head>\n<body>\n<h1>Parameters Info</h1>\n");
+        private void handlePostRequest(String resourcePath, Map<String, String> parameters, PrintWriter out) {
+            // Check if the POST request is from the form submission
+            if ("/params_info.html".equals(resourcePath)) {
+                // Generate the HTML page with parameter details
+                StringBuilder htmlResponse = new StringBuilder();
+                htmlResponse.append("<!DOCTYPE html>\n<html>\n<head>\n")
+                           .append("<title>Parameters Info</title>\n")
+                           .append("<style>")
+                           .append("body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333; }\n")
+                           .append("h1 { color: #444; background-color: #ddd; padding: 10px; text-align: center; }\n")
+                           .append("ul { list-style: none; padding: 0; }\n")
+                           .append("li { background: #fff; padding: 10px; margin: 10px; border: 1px solid #ddd; }\n")
+                           .append("</style>\n")
+                           .append("</head>\n<body>\n<h1>Parameters Info</h1>\n");
         
-            // Define the order of parameters based on their names in the form
-            String[] parameterOrder = {"sender", "receiver", "subject", "message", "confirm"};
-        
-            htmlResponse.append("<ul>\n");
-            for (String paramName : parameterOrder) {
-                String paramValue = parameters.get(paramName);
-                if (paramValue != null) {
-                    htmlResponse.append("<li><strong>").append(paramName).append(":</strong> ").append(paramValue).append("</li>\n");
+                // Append parameters to the response
+                htmlResponse.append("<ul>\n");
+                for (Map.Entry<String, String> entry : parameters.entrySet()) {
+                    htmlResponse.append("<li><strong>").append(entry.getKey()).append(":</strong> ").append(entry.getValue()).append("</li>\n");
                 }
+                htmlResponse.append("</ul>\n");
+        
+                htmlResponse.append("</body>\n</html>");
+        
+                // Send the HTML content as the response
+                sendResponse(out, 200, "OK", "text/html", htmlResponse.toString());
+            } else {
+                // Handle other POST requests
+                String htmlResponse = "<!DOCTYPE html>\n<html>\n<head>\n"
+                                    + "<title>Post Request - Have a Nice Day</title>\n"
+                                    + "</head>\n<body>\n"
+                                    + "<h1>Post Request - Have a Nice Day</h1>\n"
+                                    + "</body>\n</html>";
+        
+                // Send the HTML content as the response
+                sendResponse(out, 200, "OK", "text/html", htmlResponse);
             }
-            htmlResponse.append("</ul>\n");
-        
-            htmlResponse.append("</body>\n</html>");
-        
-            // Send the HTML content as the response
-            sendResponse(out, 200, "OK", "text/html", htmlResponse.toString());
         }
+        
 
         private String sanitizeResourcePath(String resourcePath) {
             // Remove occurrences of '/../' to prevent directory traversal

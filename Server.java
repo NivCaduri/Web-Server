@@ -59,22 +59,21 @@ public class Server {
 
         @Override
         public void run() {
-            PrintWriter out = null;
-            try (
+            OutputStream binaryOut = null;
+            try {
+                binaryOut = socket.getOutputStream();
                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                OutputStream binaryOut = socket.getOutputStream();
-            ) {
-                out = new PrintWriter(binaryOut, true);
+        
                 String requestLine = in.readLine();
                 System.out.println("Received HTTP request: " + requestLine);
                 if (requestLine == null) {
-                    sendResponse(out, 400, "Bad Request", "text/plain", "Empty request.");
+                    sendResponse(binaryOut, 400, "Bad Request", "text/plain", "Empty request.".getBytes());
                     return;
                 }
         
                 String[] requestParts = requestLine.split(" ");
                 if (requestParts.length != 3) {
-                    sendResponse(out, 400, "Bad Request", "text/plain", "Malformed request.");
+                    sendResponse(binaryOut, 400, "Bad Request", "text/plain", "Malformed request.".getBytes());
                     return;
                 }
         
@@ -82,53 +81,48 @@ public class Server {
                 String resourcePath = requestParts[1];
         
                 if ("GET".equals(method)) {
-                    handleGetRequest(resourcePath, out, binaryOut);
+                    handleGetRequest(resourcePath, binaryOut);
                 } else if ("POST".equals(method)) {
-                    String requestBody = "";
-                    try {
-                        int contentLength = 0;
-                        String contentLengthHeader = null;
-        
-                        // Read request headers to find Content-Length
-                        while (true) {
-                            String headerLine = in.readLine();
-                            if (headerLine == null || headerLine.isEmpty()) {
-                                break;
-                            }
-                            if (headerLine.startsWith("Content-Length: ")) {
-                                contentLengthHeader = headerLine;
-                            }
+                    StringBuilder requestBody = new StringBuilder();
+                    String contentLengthHeader = null;
+                    String line;
+                    while ((line = in.readLine()) != null && !line.isEmpty()) {
+                        if (line.startsWith("Content-Length: ")) {
+                            contentLengthHeader = line.split(" ")[1];
                         }
-        
-                        if (contentLengthHeader != null) {
-                            contentLength = Integer.parseInt(contentLengthHeader.substring("Content-Length: ".length()));
-                        }
-        
-                        // Read the POST request body
-                        char[] buffer = new char[contentLength];
-                        in.read(buffer, 0, contentLength);
-                        requestBody = new String(buffer);
-                    } catch (IOException ex) {
-                        // Handle any exceptions
                     }
         
-                    System.out.println("Received POST data:\n" + requestBody); // Debugging line
+                    int contentLength = 0;
+                    if (contentLengthHeader != null) {
+                        contentLength = Integer.parseInt(contentLengthHeader.trim());
+                    }
         
-                    Map<String, String> parameters = parseParameters(requestBody);
-                    handlePostRequest(resourcePath, parameters, out);
+                    for (int i = 0; i < contentLength; i++) {
+                        int ch = in.read();
+                        if (ch != -1) {
+                            requestBody.append((char) ch);
+                        }
+                    }
+        
+                    Map<String, String> parameters = parseParameters(requestBody.toString());
+                    handlePostRequest(resourcePath, parameters, binaryOut);
                 } else {
-                    sendResponse(out, 501, "Not Implemented", "text/plain", "Method not implemented.");
+                    sendResponse(binaryOut, 501, "Not Implemented", "text/plain", "Method not implemented.".getBytes());
                 }
         
             } catch (IOException ex) {
-                if (out != null) {
-                    sendResponse(out, 500, "Internal Server Error", "text/plain", "Internal server error.");
+                if (binaryOut != null) {
+                    try {
+                        sendResponse(binaryOut, 500, "Internal Server Error", "text/plain", "Internal server error.".getBytes());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
                 ex.printStackTrace();
             } finally {
                 try {
-                    if (out != null) {
-                        out.close();
+                    if (binaryOut != null) {
+                        binaryOut.close();
                     }
                     socket.close();
                 } catch (IOException e) {
@@ -137,90 +131,41 @@ public class Server {
             }
         }
         
+        
 
         private static ThreadLocal<Boolean> useChunked = ThreadLocal.withInitial(() -> false);
 
-        private static void sendResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, String responseText) {
-            boolean chunked = useChunked.get();
-            if (chunked) {
-                System.out.println("using chunked HTML");
-                sendChunkedResponse(out, statusCode, statusMessage, contentType, responseText);
-            } else {
-                System.out.println("not using chunked HTML");
-                sendNormalResponse(out, statusCode, statusMessage, contentType, responseText);
-            }
-        }
-
-        private static void sendBinaryResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, byte[] responseData) throws IOException {
-            boolean chunked = useChunked.get();
-            if (chunked) {
-                System.out.println("using chunked image");
-                sendChunkedBinaryResponse(binaryOut, statusCode, statusMessage, contentType, responseData);
-            } else {
-                System.out.println("not using chunked image");
-                sendNormalBinaryResponse(binaryOut, statusCode, statusMessage, contentType, responseData);
-            }
-        }
-
-        private static void sendNormalResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, String responseText) {
-            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\nContent-Type: " + contentType + "\nContent-Length: " + responseText.length() + "\n";
-            System.out.println("Sending HTTP response: \n" + httpResponse);
-            out.println(httpResponse);
-            out.println();
-            out.println(responseText);
-            out.flush();
-        }
-
-        private static void sendChunkedResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, String responseText) {
-            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\nContent-Type: " + contentType + "\r\nTransfer-Encoding: chunked\r\n\r\n";
-            System.out.println("Sending HTTP response: \n" + httpResponse);
-            out.print(httpResponse);
-            out.flush();
-        
-            // Send response body in chunks
-            int chunkSize = 1024;
-            for (int i = 0; i < responseText.length(); i += chunkSize) {
-                int endIndex = Math.min(i + chunkSize, responseText.length());
-                String chunk = Integer.toHexString(endIndex - i) + "\r\n" + responseText.substring(i, endIndex) + "\r\n";
-                out.print(chunk);
-                out.flush();
-            }
-            // Send the last chunk to indicate end of response
-            out.print("0\r\n\r\n");
-            out.flush();
-        }
-
-        private static void sendNormalBinaryResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, byte[] responseData) throws IOException {
+        private static void sendResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, byte[] content) throws IOException {
             PrintWriter headerOut = new PrintWriter(binaryOut, true);
-            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\nContent-Type: " + contentType + "\nContent-Length: " + responseData.length + "\n";
-            System.out.println("Sending HTTP response: \n" + httpResponse);
-            headerOut.println(httpResponse);
-            headerOut.flush();
-
-            binaryOut.write(responseData);
-            binaryOut.flush();
-        }
-
-        private static void sendChunkedBinaryResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, byte[] responseData) throws IOException {
-            PrintWriter headerOut = new PrintWriter(binaryOut, true);
-            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\nContent-Type: " + contentType + "\r\nTransfer-Encoding: chunked\r\n\r\n";
-            System.out.println("Sending HTTP response: \n" + httpResponse);
-            headerOut.print(httpResponse);
-            headerOut.flush();
+            boolean chunked = useChunked.get();
         
-            // Send response body in chunks
-            int chunkSize = 1024; // Adjust chunk size as needed
-            for (int i = 0; i < responseData.length; i += chunkSize) {
-                int endIndex = Math.min(i + chunkSize, responseData.length);
-                String chunkSizeHeader = Integer.toHexString(endIndex - i) + "\r\n";
-                binaryOut.write(chunkSizeHeader.getBytes());
-                binaryOut.write(Arrays.copyOfRange(responseData, i, endIndex));
-                binaryOut.write("\r\n".getBytes());
+            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\nContent-Type: " + contentType + "\r\n";
+        
+            if (chunked) {
+                System.out.println(chunked); // Debugging line
+                httpResponse += "Transfer-Encoding: chunked\r\n\r\n";
+                headerOut.print(httpResponse);
+                headerOut.flush();
+        
+                int chunkSize = 20; // Adjust chunk size as needed
+                for (int i = 0; i < content.length; i += chunkSize) {
+                    int endIndex = Math.min(i + chunkSize, content.length);
+                    String chunkHeader = Integer.toHexString(endIndex - i) + "\r\n";
+                    binaryOut.write(chunkHeader.getBytes());
+                    binaryOut.write(content, i, endIndex - i);
+                    binaryOut.write("\r\n".getBytes());
+                    binaryOut.flush();
+                }
+        
+                binaryOut.write("0\r\n\r\n".getBytes());
+                binaryOut.flush();
+            } else {
+                httpResponse += "Content-Length: " + content.length + "\r\n\r\n";
+                headerOut.print(httpResponse);
+                headerOut.flush();
+                binaryOut.write(content);
                 binaryOut.flush();
             }
-            // Send the last chunk to indicate end of response
-            binaryOut.write("0\r\n\r\n".getBytes());
-            binaryOut.flush();
         }
 
     
@@ -236,13 +181,16 @@ public class Server {
             }
         }
 
-        private void handleGetRequest(String resourcePath, PrintWriter out, OutputStream binaryOut) {
-            
+        private void handleGetRequest(String resourcePath, OutputStream binaryOut) {
             // Sanitize the resourcePath to prevent directory traversal
             resourcePath = sanitizeResourcePath(resourcePath);
+        
             if (resourcePath.contains("?chunked:yes")) {
                 useChunked.set(true);
-                resourcePath = resourcePath.split("\\?")[0]; // Remove the query parameter from the path
+                System.out.println("Chunked transfer enabled for this request."); // Debugging line
+                resourcePath = resourcePath.split("\\?")[0]; // Remove the query parameter
+            } else {
+                useChunked.set(false); // Ensure it's set to false if not chunked
             }
         
             if ("/".equals(resourcePath)) {
@@ -251,24 +199,33 @@ public class Server {
                 resourcePath = root + resourcePath;
             }
         
-
             File resourceFile = new File(resourcePath);
             if (resourceFile.exists() && resourceFile.isFile()) {
                 try {
                     String contentType = getContentType(resourcePath);
+                    byte[] content;
                     if (contentType.startsWith("text/") || contentType.equals("application/octet-stream")) {
-                        sendResponse(out, 200, "OK", contentType, readFileContents(resourceFile));
-                    } else { // for binary data like images
-                        sendBinaryResponse(binaryOut, 200, "OK", contentType, readBinaryFileContents(resourceFile));
+                        content = readFileContents(resourceFile).getBytes();
+                    } else {
+                        content = readBinaryFileContents(resourceFile);
                     }
+                    sendResponse(binaryOut, 200, "OK", contentType, content);
                 } catch (IOException e) {
-                    sendResponse(out, 500, "Internal Server Error", "text/plain", "Internal server error.");
+                    try {
+                        sendResponse(binaryOut, 500, "Internal Server Error", "text/plain", "Internal server error.".getBytes());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
                 }
             } else {
-                sendResponse(out, 404, "Not Found", "text/plain", "Resource not found.");
+                try {
+                    sendResponse(binaryOut, 404, "Not Found", "text/plain", "Resource not found.".getBytes());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
-
+                
         private String readFileContents(File file) throws IOException {
             StringBuilder content = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
@@ -281,6 +238,7 @@ public class Server {
         }
 
         private byte[] readBinaryFileContents(File file) throws IOException {
+            System.out.println("chunked image");
             ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
             try (FileInputStream fileInput = new FileInputStream(file)) {
                 byte[] buffer = new byte[1024];
@@ -313,7 +271,7 @@ public class Server {
             return parameters;
         }
 
-        private void handlePostRequest(String resourcePath, Map<String, String> parameters, PrintWriter out) {
+        private void handlePostRequest(String resourcePath, Map<String, String> parameters, OutputStream binaryOut) {
             // Check if the POST request is from the form submission
             if ("/params_info.html".equals(resourcePath)) {
                 // Generate the HTML page with parameter details
@@ -338,20 +296,35 @@ public class Server {
                 htmlResponse.append("</body>\n</html>");
         
                 // Send the HTML content as the response
-                sendResponse(out, 200, "OK", "text/html", htmlResponse.toString());
+                try {
+                    sendResponse(binaryOut, 200, "OK", "text/html", htmlResponse.toString().getBytes());
+                } catch (IOException e) {
+                    try {
+                        sendResponse(binaryOut, 500, "Internal Server Error", "text/plain", "Internal server error.".getBytes());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
             } else {
                 // Handle other POST requests
                 String htmlResponse = "<!DOCTYPE html>\n<html>\n<head>\n"
-                                    + "<title>Post Request - Have a Nice Day</title>\n"
+                                    + "<title> You made a Post Request! - Have a Nice Day :)</title>\n"
                                     + "</head>\n<body>\n"
-                                    + "<h1>Post Request - Have a Nice Day</h1>\n"
+                                    + "<h1>You made a Post Request! - Have a Nice Day :)</h1>\n"
                                     + "</body>\n</html>";
         
                 // Send the HTML content as the response
-                sendResponse(out, 200, "OK", "text/html", htmlResponse);
+                try {
+                    sendResponse(binaryOut, 200, "OK", "text/html", htmlResponse.getBytes());
+                } catch (IOException e) {
+                    try {
+                        sendResponse(binaryOut, 500, "Internal Server Error", "text/plain", "Internal server error.".getBytes());
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
             }
         }
-        
 
         private String sanitizeResourcePath(String resourcePath) {
             // Remove occurrences of '/../' to prevent directory traversal
@@ -359,7 +332,7 @@ public class Server {
             return resourcePath;
         }
         
-        private void handleHeadRequest(String resourcePath, PrintWriter out) {
+        private void handleHeadRequest(String resourcePath, OutputStream binaryOut) {
             // Implement handling of HEAD request here
             // This method should behave similar to GET but without sending the actual content
             // You should print request and response headers as per the requirement
@@ -375,22 +348,31 @@ public class Server {
             File resourceFile = new File(resourcePath);
             if (resourceFile.exists() && resourceFile.isFile()) {
                 String contentType = getContentType(resourcePath);
-                long contentLength = resourceFile.length(); // New line to get content length
-                sendHeadResponse(out, 200, "OK", contentType, contentLength); // New line to send HEAD response
+                long contentLength = resourceFile.length(); // Get content length
+                try {
+                    sendHeadResponse(binaryOut, 200, "OK", contentType, contentLength); // Send HEAD response
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             } else {
-                sendResponse(out, 404, "Not Found", "text/plain", "Resource not found.");
+                try {
+                    sendResponse(binaryOut, 404, "Not Found", "text/plain", "Resource not found.".getBytes());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
-                
-        private void sendHeadResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, long contentLength) {
-            out.println("HTTP/1.1 " + statusCode + " " + statusMessage);
-            out.println("Content-Type: " + contentType);
-            out.println("Content-Length: " + contentLength); // New line to include content length
-            out.println(); // New line to indicate end of headers
-            out.flush();
+        
+        private void sendHeadResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, long contentLength) throws IOException {
+            PrintWriter headerOut = new PrintWriter(binaryOut, true);
+            String httpResponse = "HTTP/1.1 " + statusCode + " " + statusMessage + "\r\n" +
+                                  "Content-Type: " + contentType + "\r\n" +
+                                  "Content-Length: " + contentLength + "\r\n\r\n";
+            headerOut.print(httpResponse);
+            headerOut.flush();
         }
         
-        private void handleTraceRequest(BufferedReader in, PrintWriter out) throws IOException {
+        private void handleTraceRequest(BufferedReader in, OutputStream binaryOut) throws IOException {
             // Implement handling of TRACE request here
             // This method should echo back the received request headers to the client
             StringBuilder requestHeaders = new StringBuilder();
@@ -399,14 +381,12 @@ public class Server {
                 requestHeaders.append(line).append("\r\n");
             }
         
-            // Print received request headers
+            // Print received request headers for debugging
             System.out.println("Received TRACE request headers:");
             System.out.println(requestHeaders.toString());
         
             // Send back the received request headers to the client
-            sendResponse(out, 200, "OK", "message/http", requestHeaders.toString());
-
-            
+            sendResponse(binaryOut, 200, "OK", "message/http", requestHeaders.toString().getBytes());
         }
 
         

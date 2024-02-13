@@ -85,7 +85,7 @@ public class Server {
                 String resourcePath = requestParts[1];
         
                 if ("GET".equals(method)) {
-                    System.out.println(resourcePath.toString());
+                    //System.out.println(resourcePath.toString()); for deBugging
                     handleGetRequest(resourcePath, out, binaryOut);
                 } else if ("POST".equals(method)) {
                     String requestBody = "";
@@ -145,21 +145,23 @@ public class Server {
         //private static ThreadLocal<Boolean> useChunked = ThreadLocal.withInitial(() -> false);
 
         private static void sendResponse(PrintWriter out, int statusCode, String statusMessage, String contentType, String responseText) {
+            System.out.println("Response Content:\n" + responseText);
             if (useChunked) {
-                System.out.println("using chunked HTML");
+                //System.out.println("using chunked HTML");
                 sendChunkedResponse(out, statusCode, statusMessage, contentType, responseText);
             } else {
-                System.out.println("not using chunked HTML");
+                //System.out.println("not using chunked HTML");
                 sendNormalResponse(out, statusCode, statusMessage, contentType, responseText);
             }
         }
 
         private static void sendBinaryResponse(OutputStream binaryOut, int statusCode, String statusMessage, String contentType, byte[] responseData) throws IOException {
+            System.out.println("Sending Binary Response: Content-Type: " + contentType + ", Size: " + responseData.length + " bytes");
             if (useChunked) {
-                System.out.println("using chunked image");
+                //System.out.println("using chunked image");
                 sendChunkedBinaryResponse(binaryOut, statusCode, statusMessage, contentType, responseData);
             } else {
-                System.out.println("not using chunked image");
+                //System.out.println("not using chunked image");
                 sendNormalBinaryResponse(binaryOut, statusCode, statusMessage, contentType, responseData);
             }
         }
@@ -346,17 +348,25 @@ public class Server {
                 sendResponse(out, 200, "OK", "text/html", htmlResponse.toString());
             } else {
                 // Handle other POST requests
-                String htmlResponse = "<!DOCTYPE html>\n<html>\n<head>\n"
-                                    + "<title>Post Request - Have a Nice Day</title>\n"
-                                    + "</head>\n<body>\n"
-                                    + "<h1>Post Request - Have a Nice Day</h1>\n"
-                                    + "</body>\n</html>";
+                StringBuilder htmlResponse = new StringBuilder();
+                htmlResponse.append("<!DOCTYPE html>\n<html>\n<head>\n")
+                            .append("<title>Post Request - Have a Nice Day :)</title>\n")
+                            .append("</head>\n<body>\n")
+                            .append("<h1>Post Request - Have a Nice Day :)</h1>\n");
+        
+                // Append parameters to the response for other POST requests
+                htmlResponse.append("<ul>\n");
+                for (Map.Entry<String, String> entry : parameters.entrySet()) {
+                    htmlResponse.append("<li><strong>").append(entry.getKey()).append(":</strong> ").append(entry.getValue()).append("</li>\n");
+                }
+                htmlResponse.append("</ul>\n");
+        
+                htmlResponse.append("</body>\n</html>");
         
                 // Send the HTML content as the response
-                sendResponse(out, 200, "OK", "text/html", htmlResponse);
+                sendResponse(out, 200, "OK", "text/html", htmlResponse.toString());
             }
-        }
-        
+        }        
 
         private String sanitizeResourcePath(String resourcePath) {
             // Remove occurrences of '/../' to prevent directory traversal
